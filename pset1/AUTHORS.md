@@ -5,6 +5,7 @@ Students
 --------
 (List your team members and describe in a couple words how you divided the
 work.)
+
 Elton Lossner
 Niamh Mulholland
 

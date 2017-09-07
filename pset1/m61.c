@@ -6,6 +6,19 @@
 #include <inttypes.h>
 #include <assert.h>
 
+int numActive = 0;
+int numAllocations = 0;
+int numFails = 0;
+int activeSize = 0;
+int totalSize = 0;
+int failSize = 0;
+int longintSize = sizeof(long int);
+
+struct metadata {
+    int datasize;
+    char* payload;
+};
+
 /// m61_malloc(sz, file, line)
 ///    Return a pointer to `sz` bytes of newly-allocated dynamic memory.
 ///    The memory is not initialized. If `sz == 0`, then m61_malloc may
@@ -15,6 +28,23 @@
 void* m61_malloc(size_t sz, const char* file, int line) {
     (void) file, (void) line;   // avoid uninitialized variable warnings
     // Your code here.
+    if (sz == 0) {
+        return NULL;
+    }
+    numAllocations++;
+    if (sz > 0 && base_malloc(sz) == NULL) {
+        printf("FAIL!!");
+        numFails++;
+        failSize += sz;
+        return NULL;
+    }
+    totalSize += sz;
+    numActive++;
+    activeSize+= sz; //new
+
+    //struct metadata dataInput;
+    //metadata.datasize = sz;
+    //metadata.payload = file;
     return base_malloc(sz);
 }
 
@@ -28,6 +58,7 @@ void* m61_malloc(size_t sz, const char* file, int line) {
 void m61_free(void *ptr, const char *file, int line) {
     (void) file, (void) line;   // avoid uninitialized variable warnings
     // Your code here.
+    numActive--;
     base_free(ptr);
 }
 
@@ -78,6 +109,21 @@ void m61_getstatistics(struct m61_statistics* stats) {
     // Stub: set all statistics to enormous numbers
     memset(stats, 255, sizeof(struct m61_statistics));
     // Your code here.
+    unsigned long long nactive;
+    unsigned long long active_size;       // number of bytes in active allocations
+    unsigned long long ntotal;            // number of allocations, total
+    unsigned long long total_size;        // number of bytes in allocations, total
+    unsigned long long nfail;             // number of failed allocation attempts
+    unsigned long long fail_size;         // number of bytes in failed allocation attempts
+    char* heap_min;                       // smallest address in any region ever allocated
+    char* heap_max;                       // largest address in any region ever allocated
+
+    stats->nactive = numActive;
+    stats->ntotal = numAllocations;
+    stats->nfail = numFails;
+    stats->active_size = activeSize;
+    stats->total_size = totalSize;
+    stats->fail_size = failSize;
 }
 
 
