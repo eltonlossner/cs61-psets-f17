@@ -5,17 +5,20 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <assert.h>
+#include <limits.h>
 
-int numActive = 0;
-int numAllocations = 0;
-int numFails = 0;
-int activeSize = 0;
-int totalSize = 0;
-int failSize = 0;
-int longintSize = sizeof(long int);
+unsigned long long numActive = 0;
+unsigned long long numAllocations = 0;
+unsigned long long numFails = 0;
+unsigned long long activeSize = 0;
+unsigned long long totalSize = 0;
+unsigned long long failSize = 0;
+char* myHeap_max = (char *)0;
+char* myHeap_min = (char *)UINTPTR_MAX;
+//int longintSize = sizeof(long int);
 
 struct metadata {
-    int datasize;
+    unsigned long long datasize;
     char* payload;
 };
 
@@ -28,24 +31,39 @@ struct metadata {
 void* m61_malloc(size_t sz, const char* file, int line) {
     (void) file, (void) line;   // avoid uninitialized variable warnings
     // Your code here.
-    if (sz == 0) {
-        return NULL;
-    }
-    numAllocations++;
-    if (sz > 0 && base_malloc(sz) == NULL) {
-        printf("FAIL!!");
+
+    char *baseMalloc = base_malloc(sz);
+    if (baseMalloc == NULL && sz > 0) {
         numFails++;
         failSize += sz;
-        return NULL;
     }
-    totalSize += sz;
-    numActive++;
-    activeSize+= sz; //new
+    else {
+        base_free(*baseMalloc);
+        struct metadata *thisAllocation;
+        thisAllocation = base_malloc(sizeof(struct metadata) + sz);
+        thisAllocation->datasize = sz;
+        thisAllocation->payload =  thisAllocation;
+        char* finalPointer = thisAllocation->payload + sizeof(struct metadata); 
+
+        numAllocations++;
+        totalSize += sz;
+        numActive++;
+        activeSize+= sz;
+
+        if ((uintptr_t) myHeap_min > (uintptr_t) thisAllocation) {
+            myHeap_min = thisAllocation;
+        }
+        if ((uintptr_t) (finalPointer + sz) > myHeap_max) {
+            myHeap_max = finalPointer + sz;
+        }
+
+        return finalPointer;
+    }
 
     //struct metadata dataInput;
     //metadata.datasize = sz;
     //metadata.payload = file;
-    return base_malloc(sz);
+    return NULL;
 }
 
 
@@ -58,8 +76,12 @@ void* m61_malloc(size_t sz, const char* file, int line) {
 void m61_free(void *ptr, const char *file, int line) {
     (void) file, (void) line;   // avoid uninitialized variable warnings
     // Your code here.
-    numActive--;
-    base_free(ptr);
+    if (ptr != NULL) {
+        struct metadata *thisDeallocation = ptr - sizeof(struct metadata);
+        numActive--;
+        activeSize -= thisDeallocation->datasize;
+        base_free(ptr);
+    }
 }
 
 
@@ -124,6 +146,9 @@ void m61_getstatistics(struct m61_statistics* stats) {
     stats->active_size = activeSize;
     stats->total_size = totalSize;
     stats->fail_size = failSize;
+    stats->heap_min = myHeap_min;
+    stats->heap_max = myHeap_max;
+    //printf("ayylmao");
 }
 
 
@@ -134,6 +159,7 @@ void m61_printstatistics(void) {
     struct m61_statistics stats;
     m61_getstatistics(&stats);
 
+    //printf("meme");
     printf("malloc count: active %10llu   total %10llu   fail %10llu\n",
            stats.nactive, stats.ntotal, stats.nfail);
     printf("malloc size:  active %10llu   total %10llu   fail %10llu\n",
